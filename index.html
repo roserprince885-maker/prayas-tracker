@@ -5,12 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Prayas JEE 2027 — Study Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="light-mode">
 
-  <!-- ========== HEADER ========== -->
+  <!-- SETUP SCREEN -->
+  <div id="setupScreen" class="setup-screen hidden">
+    <div class="setup-box">
+      <div class="setup-logo">PRAYAS JEE 2027</div>
+      <h2>Connect to Cloud Sync</h2>
+      <p>Enter your Supabase credentials to sync progress across all devices.</p>
+      <div class="setup-field">
+        <label>Supabase Project URL</label>
+        <input type="text" id="sbUrl" placeholder="https://xxxx.supabase.co" autocomplete="off" />
+      </div>
+      <div class="setup-field">
+        <label>Supabase Anon Key</label>
+        <input type="text" id="sbKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off" />
+      </div>
+      <div class="setup-field">
+        <label>Your Name / Device ID</label>
+        <input type="text" id="sbUser" placeholder="e.g. Prince" autocomplete="off" />
+      </div>
+      <button class="btn-primary" id="setupSave">Connect & Start →</button>
+      <p class="setup-help">Don't have Supabase yet? <a href="#" id="showGuide">See setup guide</a></p>
+    </div>
+  </div>
+
+  <!-- SUPABASE GUIDE MODAL -->
+  <div class="modal-overlay" id="supaGuideModal">
+    <div class="modal-box modal-wide">
+      <h3>How to set up Supabase (free, 5 minutes)</h3>
+      <ol class="guide-steps">
+        <li>Go to <strong>supabase.com</strong> → click <strong>Start your project</strong> → sign up free</li>
+        <li>Click <strong>New project</strong> → give it a name like <code>prayas-tracker</code> → set a database password → click <strong>Create</strong></li>
+        <li>Wait ~1 minute for it to set up, then go to <strong>Project Settings → API</strong></li>
+        <li>Copy the <strong>Project URL</strong> and the <strong>anon / public key</strong></li>
+        <li>Now go to the <strong>SQL Editor</strong> tab in Supabase and paste this SQL, then click <strong>Run</strong>:</li>
+      </ol>
+      <pre class="sql-block">CREATE TABLE IF NOT EXISTS tracker (
+  key TEXT PRIMARY KEY,
+  value TEXT,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);</pre>
+      <p style="margin-top:10px;font-size:13px;color:var(--text2)">That's it! Come back here, paste your URL and key, and you're synced.</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="closeGuide">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
   <header class="site-header">
     <div class="header-left">
       <span class="logo-badge">PRAYAS</span>
@@ -26,61 +72,59 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="sync-status" id="syncStatus" title="Sync status">
+        <span class="sync-dot" id="syncDot"></span>
+        <span class="sync-label" id="syncLabel">Syncing...</span>
+      </div>
       <button class="btn-icon" id="darkModeToggle" title="Toggle Dark Mode">🌙</button>
       <button class="btn-icon" id="printBtn" title="Print Progress">🖨️</button>
+      <button class="btn-icon" id="settingsBtn" title="Settings">⚙️</button>
     </div>
   </header>
 
-  <!-- ========== COUNTDOWN & INFO STRIP ========== -->
+  <!-- INFO STRIP -->
   <div class="info-strip">
     <div class="info-card countdown-card">
-      <div class="info-label">Days to JEE Main Session 1</div>
+      <div class="info-label">Days to JEE Main</div>
       <div class="info-value" id="daysCountdown">—</div>
       <div class="info-sub">Jan 1, 2027</div>
     </div>
-    <div class="info-card today-card">
-      <div class="info-label">Today's Lectures</div>
-      <div id="todayLectures" class="today-lectures-list">No lectures today</div>
-    </div>
     <div class="info-card next-test-card">
       <div class="info-label">Next Test</div>
-      <div id="nextTestName" class="info-value">—</div>
+      <div id="nextTestName" class="info-value-sm">—</div>
       <div id="nextTestDate" class="info-sub">—</div>
       <div id="nextTestDays" class="test-days-badge">—</div>
     </div>
-  </div>
-
-  <!-- ========== OVERALL PROGRESS BAR ========== -->
-  <div class="overall-progress-section">
-    <div class="op-header">
-      <span>Overall Progress</span>
-      <span id="overallPercent">0%</span>
+    <div class="info-card overall-card">
+      <div class="info-label">Overall Progress</div>
+      <div class="op-row">
+        <div class="op-bar-track"><div class="op-bar-fill" id="overallBar"></div></div>
+        <span id="overallPercent" class="op-pct">0%</span>
+      </div>
+      <div class="subject-mini-bars" id="subjectMiniBar"></div>
     </div>
-    <div class="op-bar-track"><div class="op-bar-fill" id="overallBar"></div></div>
-    <div class="subject-mini-bars" id="subjectMiniBar"></div>
   </div>
 
-  <!-- ========== NAV TABS ========== -->
+  <!-- NAV TABS -->
   <nav class="subject-nav" id="subjectNav">
     <button class="nav-tab active" data-subject="all">📊 Overview</button>
     <button class="nav-tab" data-subject="Physics">⚡ Physics</button>
-    <button class="nav-tab" data-subject="Physical Chemistry">🧪 Physical Chem</button>
+    <button class="nav-tab" data-subject="Physical Chemistry">🧪 Phy. Chem</button>
     <button class="nav-tab" data-subject="Inorganic Chemistry">⚗️ Inorganic</button>
     <button class="nav-tab" data-subject="Organic Chemistry">🔬 Organic</button>
-    <button class="nav-tab" data-subject="Mathematics">📐 Mathematics</button>
+    <button class="nav-tab" data-subject="Mathematics">📐 Maths</button>
     <button class="nav-tab" data-subject="tests">📝 Tests</button>
+    <button class="nav-tab" data-subject="daily">✅ Daily Tasks</button>
   </nav>
 
-  <!-- ========== MAIN CONTENT ========== -->
-  <main class="main-content" id="mainContent">
-    <!-- Dynamically rendered -->
-  </main>
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent"></main>
 
-  <!-- ========== PRINT MODAL ========== -->
+  <!-- PRINT MODAL -->
   <div class="modal-overlay" id="printModal">
     <div class="modal-box">
       <h3>Print / Export Progress</h3>
-      <p>Select what to include in the PDF:</p>
+      <p>Select what to include:</p>
       <label><input type="checkbox" id="pr_physics" checked> Physics</label>
       <label><input type="checkbox" id="pr_pchem" checked> Physical Chemistry</label>
       <label><input type="checkbox" id="pr_inorg" checked> Inorganic Chemistry</label>
@@ -94,7 +138,19 @@
     </div>
   </div>
 
-  <!-- ========== SCRIPTS ========== -->
+  <!-- SETTINGS MODAL -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-box">
+      <h3>⚙️ Settings</h3>
+      <p>Your current connection:</p>
+      <div class="settings-info" id="settingsInfo"></div>
+      <div class="modal-actions" style="flex-direction:column;gap:8px">
+        <button class="btn-secondary" id="reconfigBtn">Reconfigure Supabase</button>
+        <button class="btn-secondary" id="closeSettings">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="data/curriculum.js"></script>
   <script src="js/app.js"></script>
 </body>
